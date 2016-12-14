@@ -6,3 +6,4 @@ Git tracks changes.
 Git tracks change of files.
 Creating a new branch is quick And simple.
 Edit readme.txt in new branch dev again.
+Issue-101 fixed~!
