@@ -4,4 +4,4 @@ Git has a mutable index called stage.
 Git is sittributed under the GPL.
 Git tracks changes.
 Git tracks change of files.
-Creating w new branch is quick & simple.
+Creating a new branch is quick And simple.
