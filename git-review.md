@@ -1,6 +1,6 @@
 1、git全局设置
 	git config --global user.name "nazul"
-	git config --global user.email "yanwu401909@gmail.com"
+	git config --global user.email "xxxx@xxxx.com"
 2、初始化git仓库
 	git init
 	注：建议git中的文件使用标准的utf-8编码，如果食用notepad++作为文本编辑器，需要设置编码格式为utf-8 without bom。
