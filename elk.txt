@@ -1,0 +1,172 @@
+elastic.co文档
+一、	Elastic生态体系【5.2】
+1.	Elastic生态体系是由多个相对独立的组件构成，本节中将介绍这些组件的安装以及升级。
+?	Beast
+?	Elasticsearch
+?	Elasticsearch Hadoop
+?	Kibana
+?	LogStash
+?	X-Pack
+2.	安装Elastic组件
+从5.0版本开始，大大简化了各组件之间的版本号管理和兼容性。所有组件都是Elastic生态圈的一部分，如果一个组件有新版本发布，则生态圈中所有子产品的版本也都会随之更新。这样就避免了在使用时对各组件版本的选择问题。
+因此在安装Elastic生态圈中所有的组件时，应当保证所有的组件版本号统一。例如如果安装Elasticsearch5.1.2版本，那么在安装Kibana，Lostash，Beats等产品时也应当选择5.1.2版本。
+组件	版本
+Beats	5.2
+Elasticsearch	5.2
+Elasticsearch Hadoop	5.2
+Kibana	5.2
+Logstash	5.2
+X-Pack	5.2
+?	安装顺序
+?	Elasticsearch
+?	X-Pack for Elasticsearch
+?	Kibana
+?	X-Pack for Kibana
+?	Logstash
+?	Beats
+?	Elasticsearch Hadoop
+?	在Elastic Cloud中安装
+Elastic Cloud是官方提供的便于使用的Elastic产品服务，一键创建任意大小或高可用性的Elasticsearch云服务。同时也会安装一些用于安全管理和监控的X-Pack组件。Kibana和相关的组件也可以实现一键安装。
+根据会员的级别不同，还提供了一些不同的特性，比如黄金或者铂金会员可以安装自定义插件，数据字典和脚本等功能。
+3.	更新Elastic组件
+在升级组件之前，请阅读升级手册，确保升级按照正确的顺序和方式进行的。本指南试用于使用以下组件和版本的用户。
+组件	版本
+Beats	1.0及以上版本
+Elasticsearch	2.0及以上版本
+Elasticsearch Hadoop	2.2及以上版本
+Kibana	4.2及以上版本
+Logstash	2.2及以上版本
+Marvel,Shield,Watcher,Graph,Reporting<1>	2.0及以上版本
+ 	Marvel,Shield,Watcher,Graph,Reporting等组件已经合并成X-Pack。X-Pack可以同时适用于Elasticsearch和Kibana。
+ 	Kibana4.2和ElasticSearch Hadoop2.2是第一个适配Elasticsearch2.x版本的组件。
+5.0之后的版本，各组件的版本号已经统一，因此所安装的Elastic组件都可以保持同一个版本号。
+需要特别提出的是Elasticsearch1.x版本不能升级到Elasticsearc2.x，然后在往上升级到5.x版本。这和底层使用的Lucene版本相关。相同的主版本号底层使用的Lucene版本是一致的。
+二、	Elasticsearch：存储，检索，分析【5.2】
+1.	起步
+Elasticsearch是一个高拓展的开源全文检索分析引擎。可以通过它近实时的存储，检索，分析大数据。通常用来支撑底层对有复杂检索需求的系统。
+以下是几个使用ElasticSearch的场景：
+?	一个在线的存储系统，允许你的用户检索该系统中销售的产品。本场景中可以使用Elasticsearch存储整个商品的元数据信息，然后提供良好的检索和自动补全关键词建议。
+?	收集日志或者流量数据，进行分析挖掘。使用Logstash来收集，整合，转换数据，然后将数据存入Elasticsearch中，然后进行检索或者统计分析。
+?	比价平台，用户可以指定一个规则，如果某个商品满足价格小于￥X时，提醒用户，将商品信息推送给用户。
+接下来的内容将介绍Elasticsearch的安装，配置，运行，以及一些基础操作：创建索引，查找，修改数据。最终你将会了解Elasticsearch是什么，怎么工作，并希望能通过该系统进行数据的深度检索和挖掘。
+基础概念
+Elasticsearch中有几个重要概念，了解这些概念将有助于这个手册的学习
+NearRealtime（NRT）
+Elasticsearch是一个近实时的检索平台。意思是基本上数据索引创建完成以后无需等待即可检索出数据。
+Cluster
+集群即一个或多个服务节点的集合，这个集合的所有节点共同存储数据，提供跨节点的索引和检索功能。Elastic集群有一个默认的集群名称-‘elasticsearch’。这个名字很重要，因为一旦一个节点创建，它只能从属与一个集群。
+不同的集群要确保有不同的集群名，否则节点可能会加入到错误的集群中。例如你可以分别用logging-dev，logging-stage，logging-prod来给开发环境，迭代环境和生产环境的集群命名。
+需要注意的是一个集群中即时只有一个节点也是一个有效和完整的集群。也可以同时部署多个不同集群名的独立集群。
+Node
+节点是集群中的一个单独服务，分担集群的数据存储，索引和检索能力。集群中的每个节点在启动时也会被分配一个独立编号（UUID），如果不想使用默认的节点名称，可以进行自定义。这个节点名称对集群中节点的管理非常重要。
+可以通过配置一个节点的集群名称将该节点添加到某个集群中去。默认情况下新创建的节点都将加入到名为elasticsearch的集群中，这就意味着如果你在同一个网络环境中启动多个节点，这些节点将会相互发现，并加入到名字为elasticsearch的集群中去。
+同一个集群可以有任意多个节点，新创建的节点启动时将创建一个只有一个节点的集群，名字为elasticsearch。
+Index
+一个索引是一些具有相同特性的文档集合，例如可以创建一个客户数据的索引，产品元数据的索引，订单索引等。索引名称必须是全小写字母组成，在对该索引中文档的增删改查等操作的时候都要用到该索引名。一个集群中，可以定义任意多个索引。
+Type
+在一个索引中，可以定义多种类型。一个类型是索引中同类数据的分类或分区。通常一个分类定义了某种文档类型的通用属性。例如，在一个博客系统中，可以将所有的数据放到一个索引中。在这个索引中还可以分为用户数据类型，博客数据类型和评论数据类型等。
+Document
+文档是可被索引的基本单元。例如，一个客户信息文档，一个产品信息文档，一个订单信息文档。文档可以通过互联网中通用的JSON数据格式来传输。
+Shards&Replicas
+一个索引能容纳的数据可以超过单个节点的物理限制。例如一个索引包含十亿级别的文档，需要占用1T的存储空间，如果全部存放在一个服务节点上，将会严重拖慢系统的索引或者检索速度。
+为解决这个问题，elasticsearch提供了将一个索引划分成多个分片的功能。当新创建一个索引的时候，可以定义一个索引的分片数量。每个分片都是一个独立完整的数据集。
+分片非常重要，因为：
+	允许水平分割内容列
+	允许分片分布式存放和并行操作来提升性能和吞吐量。
+对前段用户来说，分片如何分布式存储，文档如何整合，elasticsearch如何处理搜索请求这些都是透明的。
+在网络环境中，任何错误的情况都可能随时出现，为了应对这种情况，故障转移机制是非常重要和推荐使用的。另外Elasticsearch允许将分片复制多个副本。
+多副本机制也同样重要：
+	可以应对分片或节点的故障，提高可用性。并且需要注意的是分片副本不会同时存放在同一个节点中，而是分散在集群的不同节点中。
+	提高吞吐量，检索操作可以同时并发的在多个副本上执行。
+总之，一个索引可以被分割为多个分片。索引可以有0个或者多个副本。分片和副本的数量可以在索引创建时指定，分片的数量在索引创建之后是不可变的，副本的数量可以在运行时修改。
+默认情况下，每个elasticsearch的索引被划分为5个分片和1个副本，这意味着您的集群中至少要有两个节点，这样您的集群中就有5个主分片，5个副本分片。
+ 	每个分片都是一个Lucene索引。Lucene中对单个索引的文档上限有定义2,147,483,519 (= Integer.MAX_VALUE - 128)，可以通过_cat/shards接口来查看分片中文档数量。
+安装Elasticsearch
+Elasticsearch需要Java8的支持，推荐使用Oracle JDK 1.8.0_73。检查java环境用如下命令：
+java –version
+echo $JAVA_HOME
+Java环境安装好后，可以开始下载Elasticsearch的安装包并安装，*unix系统使用如下命令下载安装文件：
+curl -L -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.2.1.tar.gz
+解压：
+tar -xvf elasticsearch-5.2.1.tar.gz
+切换到启动脚本目录：
+cd elasticsearch-5.2.1/bin
+启动：
+./elasticsearch
+如果一切顺利，将看到如下信息输出在终端：
+[2016-09-16T14:17:51,251][INFO ][o.e.n.Node               ] [] initializing ...
+[2016-09-16T14:17:51,329][INFO ][o.e.e.NodeEnvironment    ] [6-bjhwl] using [1] data paths, mounts [[/ (/dev/sda1)]], net usable_space [317.7gb], net total_space [453.6gb], spins? [no], types [ext4]
+[2016-09-16T14:17:51,330][INFO ][o.e.e.NodeEnvironment    ] [6-bjhwl] heap size [1.9gb], compressed ordinary object pointers [true]
+[2016-09-16T14:17:51,333][INFO ][o.e.n.Node               ] [6-bjhwl] node name [6-bjhwl] derived from node ID; set [node.name] to override
+[2016-09-16T14:17:51,334][INFO ][o.e.n.Node               ] [6-bjhwl] version[5.2.1], pid[21261], build[f5daa16/2016-09-16T09:12:24.346Z], OS[Linux/4.4.0-36-generic/amd64], JVM[Oracle Corporation/Java HotSpot(TM) 64-Bit Server VM/1.8.0_60/25.60-b23]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [aggs-matrix-stats]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [ingest-common]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [lang-expression]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [lang-groovy]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [lang-mustache]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [lang-painless]
+[2016-09-16T14:17:51,967][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [percolator]
+[2016-09-16T14:17:51,968][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [reindex]
+[2016-09-16T14:17:51,968][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [transport-netty3]
+[2016-09-16T14:17:51,968][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded module [transport-netty4]
+[2016-09-16T14:17:51,968][INFO ][o.e.p.PluginsService     ] [6-bjhwl] loaded plugin [mapper-murmur3]
+[2016-09-16T14:17:53,521][INFO ][o.e.n.Node               ] [6-bjhwl] initialized
+[2016-09-16T14:17:53,521][INFO ][o.e.n.Node               ] [6-bjhwl] starting ...
+[2016-09-16T14:17:53,671][INFO ][o.e.t.TransportService   ] [6-bjhwl] publish_address {192.168.8.112:9300}, bound_addresses {{192.168.8.112:9300}
+[2016-09-16T14:17:53,676][WARN ][o.e.b.BootstrapCheck     ] [6-bjhwl] max virtual memory areas vm.max_map_count [65530] likely too low, increase to at least [262144]
+[2016-09-16T14:17:56,731][INFO ][o.e.h.HttpServer         ] [6-bjhwl] publish_address {192.168.8.112:9200}, bound_addresses {[::1]:9200}, {192.168.8.112:9200}
+[2016-09-16T14:17:56,732][INFO ][o.e.g.GatewayService     ] [6-bjhwl] recovered [0] indices into cluster_state
+[2016-09-16T14:17:56,748][INFO ][o.e.n.Node               ] [6-bjhwl] started
+我们可以从上面的输出中看到我们的节点被命名为“6-bjhwl”，并加入到一个集群中，该节点作为主节点。这样一个拥有单节点的集群已经开始运行。
+就如我们之前提到过的，我们可以修改集群和节点的名字。如果从启动命令行指定的话启动命令如下：
+./elasticsearch -Ecluster.name=my_cluster_name -Enode.name=my_node_name
+节点运行后，同时监听本机的9200端口并接收请求。elasticsearch默认使用9200端口作为提供REST API服务的端口，如果有必要也可以修改成其他端口。
+浏览集群概况
+REST API
+在Elasticsearch集群运行之后，接下来该了解如何跟系统交互。Elasticsearch提供了强大的REST API来操作集群。功能范围包括：
+	检查集群，节点，索引健康状态，统计信息
+管理集群，节点，索引数据和元数据
+	执行CRUD操作
+	执行高级检索操作，如分页，排序，过滤，脚本执行，整合等其他操作。
+		集群健康
+		要检查集群健康状况，可以使用_cat接口，如下：
+GET /_cat/health?v
+		相应结果：
+epoch  timestamp cluster  status node.total node.data shards pri relo init unassign pending_tasks max_task_wait_time active_shards_percent
+1475247709 17:01:49  elasticsearch green  1         1      0   0    0    0        0             0                  -                100.0%
+		从以上信息中可以看出我们的集群名是“elasticsearch”，运行状态是绿色。
+		我们检查集群运行状态的时候会返回颜色标识：绿色标识整个集群是完整并可用的，黄色标识集群所有数据是可用的，但是一些副本未达到指定数量或不可用，红色标识集群数据由于某种错误不可用。需要注意的是即使集群状态是红色，仍然有部分数据是可用的。集群仍然会在有可用分片的节点上接收并处理检索请求，但是必须及时处理这些问题，避免持续的数据损失。
+		从上面的响应中同时看到集群有一个节点，0个分片。如果在同一网络中再启动一个节点，那么新的节点也会自动加入到这个集群中，此时如果执行以上命令将看到多个节点的信息。
+		查看集群中各节点详细信息的命令：
+GET /_cat/nodes?v
+		响应如下：
+ip  heap.percent ram.percent cpu load_1m load_5m load_15m node.role master name
+127.0.0.1  1  5   5    4.46  mdi  *  PB2SGZY
+		显示所有分片信息
+GET /_cat/indices?v
+		响应如下：
+health status index uuid pri rep docs.count docs.deleted store.size pri.store.size
+		创建索引：
+PUT /customer?pretty
+GET /_cat/indices?v
+		上面的第一个命令创建了一个名为customer的索引。在请求后添加pretty可以让服务端格式化显示json数据。
+		响应如下：
+health status index    uuid  pri rep docs.count docs.deleted store.size pri.store.size
+yellow open   customer 95SQ4TSUT7mWBT7VNHH67A   5   1  0            0       260b           260b
+		第二条命令返回的结果中可以看出创建成功了一个名为customer的主分区和一个副本，目前分片中没有任何文档。
+		注意上面的结果会发现名为customer的索引当前是黄色标志。我们之前讨论过黄色表明有一些副本并未分配。由于我们当前只有一个节点，而elasticsearch中所有副本不会分配在同一个节点中，因此当前分片的副本并未分配。如果我们再集群中添加一个节点，那么副本将开始复制，此时索引的状态会转为绿色。
+2.	不兼容的修改
+3.	API变化
+4.	文档API
+5.	检索API
+6.	聚合API
+7.	分片API
+8.	cat API
+9.	集群API
+10.	查询API
+11.	映射
+12.	分析
+13.	子模块
+14.	索引模块
+三、	X-Pack：拓展包【5.2】
+四、	Elastic cloud：
